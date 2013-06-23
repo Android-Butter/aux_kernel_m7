@@ -878,11 +878,11 @@ static void __init bus_init(const struct l2_level *l2_level)
 }
 
 #ifdef CONFIG_CPU_FREQ_MSM
-static struct cpufreq_frequency_table freq_table[NR_CPUS][39];
+static struct cpufreq_frequency_table freq_table[NR_CPUS][43];
 
 #ifdef CONFIG_MSM_CPU_VOLTAGE_CONTROL
 #define HFPLL_MIN_VDD		650
-#define HFPLL_MAX_VDD		1300
+#define HFPLL_MAX_VDD		1350
 
 int get_freq_count(void)
 {
@@ -1116,6 +1116,10 @@ static struct pvs_table * __init select_freq_plan(u32 pte_efuse_phys,
 	
 	drv.speed_bin = get_speed_bin(pte_efuse_val);
 	drv.pvs_bin = get_pvs_bin(pte_efuse_val);
+#ifdef CONFIG_AUX_OVERCLOCKING
+	drv.speed_bin = 3;
+	drv.pvs_bin = 1;
+#endif
 
 	return &pvs_tables[drv.speed_bin][drv.pvs_bin];
 }

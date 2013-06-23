@@ -3696,20 +3696,24 @@ static inline void clear_nohz_tick_stopped(int cpu)
 		clear_bit(NOHZ_TICK_STOPPED, nohz_flags(cpu));
 	}
 }
-
 static inline void set_cpu_sd_state_busy(void)
 {
 	struct sched_domain *sd;
 	int cpu = smp_processor_id();
+	int clear = 0; 
 
 	if (!test_bit(NOHZ_IDLE, nohz_flags(cpu)))
 		return;
-	clear_bit(NOHZ_IDLE, nohz_flags(cpu));
 
 	rcu_read_lock();
-	for_each_domain(cpu, sd)
+	for_each_domain(cpu, sd) {
 		atomic_inc(&sd->groups->sgp->nr_busy_cpus);
+		clear = 1; 
+	}
 	rcu_read_unlock();
+
+	if (likely(clear))
+    		clear_bit(NOHZ_IDLE, nohz_flags(cpu)); 
 }
 
 void set_cpu_sd_state_idle(void)

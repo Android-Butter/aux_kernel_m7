@@ -1648,6 +1648,16 @@ unsigned long nr_iowait(void)
 	return sum;
 }
 
+unsigned long avg_nr_running(void)
+{
+	unsigned long i, sum = 0;
+
+	for_each_online_cpu(i)
+		sum += cpu_rq(i)->ave_nr_running;
+
+	return sum;
+}
+
 unsigned long nr_iowait_cpu(int cpu)
 {
 	struct rq *this = cpu_rq(cpu);
@@ -4809,7 +4819,8 @@ static void init_sched_groups_power(int cpu, struct sched_domain *sd)
 		return;
 
 	update_group_power(sd, cpu);
-	atomic_set(&sg->sgp->nr_busy_cpus, sg->group_weight);
+	atomic_set(&sg->sgp->nr_busy_cpus, 0);
+	set_bit(NOHZ_IDLE, nohz_flags(cpu));
 }
 
 int __weak arch_sd_sibling_asym_packing(void)

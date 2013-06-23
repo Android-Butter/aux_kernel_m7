@@ -1660,6 +1660,12 @@ config MSM_CPU_FREQ_MIN
 
 endif # CPU_FREQ_MSM
 
+config INTELLI_PLUG
+	bool "Enable intelli-plug cpu hotplug driver"
+	default n
+	help
+	  Generic Intelli-plug cpu hotplug driver for ARM SOCs
+
 config MSM_CPU_VOLTAGE_CONTROL
 	bool "Userspace CPU Voltage Control"
 	default n
@@ -2651,6 +2657,12 @@ config MACH_M7_UL
         bool "APQ8064 M7_UL"
         help
           Support for the HTC APQ8064 M7_UL.
+
+config AUX_OVERCLOCKING
+        depends on ARCH_APQ8064 && MACH_M7_UL
+        bool "Auxilium Overlocking"
+        help
+          Add higher frequencies to APQ8064 M7.
 
 config QSC_MODEM
         default n

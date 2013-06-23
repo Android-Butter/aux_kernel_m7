@@ -69,9 +69,7 @@ static int override_cpu;
 static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq)
 {
 	int ret = 0;
-#ifdef CONFIG_PERFLOCK
-	int perf_freq = 0;
-#endif
+
 	int saved_sched_policy = -EINVAL;
 	int saved_sched_rt_prio = -EINVAL;
 	struct cpufreq_freqs freqs;
@@ -79,17 +77,9 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq)
 	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
 
 	freqs.old = policy->cur;
-#ifdef CONFIG_PERFLOCK
-	perf_freq = perflock_override(policy, new_freq);
-	if (perf_freq) {
-		if (policy->cur == perf_freq)
-			return 0;
-		else
-			freqs.new = perf_freq;
-	} else if (override_cpu) {
-#else
+
 	if (override_cpu) {
-#endif
+
 		if (policy->cur == policy->max)
 			return 0;
 		else
