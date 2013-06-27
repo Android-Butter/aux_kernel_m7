@@ -5455,8 +5455,6 @@ static void __init m7_cdp_init(void)
 	m7_init_cam();
 #endif
 
-	platform_device_register(&cdp_kp_pdev);
-
 	if (!(board_mfg_mode() == 6 || board_mfg_mode() == 7))
 		m7_add_usb_devices();
 }
