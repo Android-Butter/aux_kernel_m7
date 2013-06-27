@@ -43,6 +43,7 @@ config DEBUG_BLDR_LOG
 	depends on ANDROID_RAM_CONSOLE
 	default n
 
+<<<<<<< HEAD
 config ANDROID_RAM_CONSOLE_ENABLE_VERBOSE
 	bool "Enable verbose console messages on Android RAM console"
 	default y
@@ -97,6 +98,12 @@ config ANDROID_RAM_CONSOLE_EARLY_SIZE
 	hex "Android RAM console buffer size"
 	default 0
 	depends on ANDROID_RAM_CONSOLE_EARLY_INIT
+=======
+config DEBUG_LAST_BLDR_LOG
+        bool "Dump Bootloader log"
+        depends on ANDROID_RAM_CONSOLE
+        default n
+>>>>>>> cdea288... misc: Update from HTC One Google Edition source
 
 config PERSISTENT_TRACER
 	bool "Persistent function tracer"

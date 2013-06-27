@@ -470,8 +470,13 @@ obj-y += display/
 
 obj-$(CONFIG_IO_FOOTPRINT) += io_footprint.o
 
+<<<<<<< HEAD
 obj-$(CONFIG_FORCE_FAST_CHARGE) += fastchg.o
 
 obj-$(CONFIG_CPU_FREQ_MSM) += cpufreq.o
 
 obj-$(CONFIG_INTELLI_PLUG) += intelli_plug.o
+=======
+#PWR2_ADD, @CPU Sniffer: CPU usage statistics.
+obj-y += htc_cpu_usage_stats.o
+>>>>>>> cdea288... misc: Update from HTC One Google Edition source
