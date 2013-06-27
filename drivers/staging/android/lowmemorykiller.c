@@ -56,9 +56,8 @@ static int lowmem_minfree[6] = {
 	16 * 1024,	/* 64MB */
 };
 static int lowmem_minfree_size = 4;
-<<<<<<< HEAD
+
 static int lmk_fast_run = 1;
-=======
 
 static size_t lowmem_fork_boost_minfree[6] = {
 	0,
@@ -70,7 +69,6 @@ static size_t lowmem_fork_boost_minfree[6] = {
 };
 static int lowmem_fork_boost_minfree_size = 6;
 static size_t minfree_tmp[6] = {0, 0, 0, 0, 0, 0};
->>>>>>> cdea288... misc: Update from HTC One Google Edition source
 
 static unsigned long lowmem_deathpending_timeout;
 
@@ -83,8 +81,6 @@ static unsigned long lowmem_deathpending_timeout;
 static int test_task_flag(struct task_struct *p, int flag)
 {
 	struct task_struct *t = p;
-<<<<<<< HEAD
-=======
 
 	do {
 		task_lock(t);
@@ -100,7 +96,6 @@ static int test_task_flag(struct task_struct *p, int flag)
 
 static int
 task_fork_notify_func(struct notifier_block *self, unsigned long val, void *data);
->>>>>>> cdea288... misc: Update from HTC One Google Edition source
 
 	do {
 		task_lock(t);
@@ -262,16 +257,6 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	int selected_tasksize = 0;
 	int selected_oom_score_adj;
 	int array_size = ARRAY_SIZE(lowmem_adj);
-<<<<<<< HEAD
-	int other_free;
-	int other_file;
-	unsigned long nr_to_scan = sc->nr_to_scan;
-
-	if (nr_to_scan > 0) {
-		if (mutex_lock_interruptible(&scan_mutex) < 0)
-			return 0;
-	}
-=======
 	int other_free = global_page_state(NR_FREE_PAGES);
 	int other_file = global_page_state(NR_FILE_PAGES) -
 		global_page_state(NR_SHMEM) - global_page_state(NR_MLOCK);
@@ -286,7 +271,6 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	}
 	else
 		min_array = lowmem_minfree;
->>>>>>> cdea288... misc: Update from HTC One Google Edition source
 
 	other_free = global_page_state(NR_FREE_PAGES);
 	other_file = global_page_state(NR_FILE_PAGES) -
@@ -299,16 +283,10 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	if (lowmem_minfree_size < array_size)
 		array_size = lowmem_minfree_size;
 	for (i = 0; i < array_size; i++) {
-<<<<<<< HEAD
-		if (other_free < lowmem_minfree[i] &&
-		    other_file < lowmem_minfree[i]) {
-			min_score_adj = lowmem_adj[i];
-=======
 		if (other_free < min_array[i] &&
 		    other_file < min_array[i]) {
 			min_score_adj = lowmem_adj[i];
 			fork_boost = lowmem_fork_boost_minfree[i];
->>>>>>> cdea288... misc: Update from HTC One Google Edition source
 			break;
 		}
 	}
@@ -339,22 +317,9 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		if (tsk->flags & PF_KTHREAD)
 			continue;
 
-<<<<<<< HEAD
-		/* if task no longer has any memory ignore it */
-		if (test_task_flag(tsk, TIF_MM_RELEASED))
-			continue;
-
 		if (time_before_eq(jiffies, lowmem_deathpending_timeout)) {
 			if (test_task_flag(tsk, TIF_MEMDIE)) {
 				rcu_read_unlock();
-				/* give the system time to free up the memory */
-				msleep_interruptible(20);
-				mutex_unlock(&scan_mutex);
-=======
-		if (time_before_eq(jiffies, lowmem_deathpending_timeout)) {
-			if (test_task_flag(tsk, TIF_MEMDIE)) {
-				rcu_read_unlock();
->>>>>>> cdea288... misc: Update from HTC One Google Edition source
 				return 0;
 			}
 		}
@@ -467,11 +432,6 @@ static int lowmem_adj_array_set(const char *val, const struct kernel_param *kp)
 
 	ret = param_array_ops.set(val, kp);
 
-<<<<<<< HEAD
-	/* HACK: Autodetect oom_adj values in lowmem_adj array */
-=======
-	
->>>>>>> cdea288... misc: Update from HTC One Google Edition source
 	lowmem_autodetect_oom_adj_values();
 
 	return ret;

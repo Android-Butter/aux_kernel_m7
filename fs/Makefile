@@ -128,9 +128,8 @@ obj-$(CONFIG_PSTORE)		+= pstore/
 
 # Patched by YAFFS
 obj-$(CONFIG_YAFFS_FS)		+= yaffs2/
-<<<<<<< HEAD
 
 obj-$(CONFIG_DYNAMIC_FSYNC)  	+= dyn_sync_cntrl.o
-=======
+
 obj-$(CONFIG_HTC_FD_MONITOR)		+= fd_monitor.o
->>>>>>> cdea288... misc: Update from HTC One Google Edition source
+

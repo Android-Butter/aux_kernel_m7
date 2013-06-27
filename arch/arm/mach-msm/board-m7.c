@@ -1138,33 +1138,6 @@ static struct sf_lut rbatt_est_ocv_id_2 = {
 
 static struct sf_lut rbatt_sf_id_2 = {
 	.rows		= 19,
-<<<<<<< HEAD
-        .cols           = 7,
-	
-        .row_entries            = {-20,-10, 0, 10, 20, 30, 40},
-        .percent        = {100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10},
-        .sf                     = {
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-                                        {226,178,155,129,80,46,30},
-        }
-=======
 	.cols           = 7,
 
 	.row_entries	= {-20,-10, 0, 10, 20, 30, 40},
@@ -1190,7 +1163,6 @@ static struct sf_lut rbatt_sf_id_2 = {
 		{226,178,155,129,80,46,30},
 		{226,178,155,129,80,46,30},
 	}
->>>>>>> cdea288... misc: Update from HTC One Google Edition source
 };
 
 static struct pc_temp_ocv_lut  pc_temp_ocv_id_2 = {
@@ -2281,8 +2253,6 @@ static int synaptics_power_LPM(int on)
 }
 
 static struct synaptics_i2c_rmi_platform_data syn_ts_3k_data[] = { 
-<<<<<<< HEAD
-=======
 	{
 		.version = 0x3332,
 		.packrat_number = 1471960,
@@ -2466,7 +2436,6 @@ static struct synaptics_i2c_rmi_platform_data syn_ts_3k_data[] = {
 			0x02
 		}
 	},
->>>>>>> cdea288... misc: Update from HTC One Google Edition source
 	{
 		.version = 0x3332,
 		.packrat_number = 1293981,
@@ -4129,7 +4098,6 @@ static struct msm_spm_seq_entry msm_spm_seq_list[] __initdata = {
 	},
 };
 
-<<<<<<< HEAD
 #ifdef CONFIG_PERFLOCK
 static unsigned msm8064_perf_acpu_table[] = {
 	594000000, 
@@ -4183,8 +4151,6 @@ static void __init perftable_fix_up(void)
 
 #endif
 
-=======
->>>>>>> cdea288... misc: Update from HTC One Google Edition source
 static uint8_t l2_spm_wfi_cmd_sequence[] __initdata = {
 	0x00, 0x20, 0x03, 0x20,
 	0x00, 0x0f,
@@ -4846,16 +4812,12 @@ static int cir_power(int on)
 		}
 	}
 
-<<<<<<< HEAD
-	if(on) {
-=======
 	if (board_mfg_mode() == MFG_MODE_POWER_TEST) {
 		pr_info("[CIR] %s recovery mode, power off CIR\n", __func__);
 		on = 0;
 	}
 
 	if (on) {
->>>>>>> cdea288... misc: Update from HTC One Google Edition source
 		rc = regulator_set_optimum_mode(reg_cir_3v, 100000);
 		if (rc < 0) {
 			pr_err("[CIR] enter high power mode fail, rc = %d\n", rc);
@@ -5492,12 +5454,9 @@ static void __init m7_cdp_init(void)
 #ifdef CONFIG_MSM_CAMERA
 	m7_init_cam();
 #endif
-<<<<<<< HEAD
-	platform_device_register(&cdp_kp_pdev);
-	
-=======
 
->>>>>>> cdea288... misc: Update from HTC One Google Edition source
+	platform_device_register(&cdp_kp_pdev);
+
 	if (!(board_mfg_mode() == 6 || board_mfg_mode() == 7))
 		m7_add_usb_devices();
 }

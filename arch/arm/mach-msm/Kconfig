@@ -2676,13 +2676,12 @@ config MACH_M7_UL
 	help
 	  Support for the HTC APQ8064 M7_UL.
 
-<<<<<<< HEAD
 config AUX_OVERCLOCKING
         depends on ARCH_APQ8064 && MACH_M7_UL
         bool "Auxilium Overlocking"
         help
           Add higher frequencies to APQ8064 M7.
-=======
+
 config MACH_M7_DXG
         depends on ARCH_APQ8064
         bool "APQ8064 M7_DXG"
@@ -2694,7 +2693,6 @@ config MACH_T6_DXG
         bool "APQ8064 T6_DXG"
         help
           Support for the HTC APQ8064 T6_DXG.
->>>>>>> cdea288... misc: Update from HTC One Google Edition source
 
 config QSC_MODEM
         default n
