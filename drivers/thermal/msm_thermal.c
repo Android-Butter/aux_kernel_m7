@@ -99,25 +99,46 @@ static void disable_msm_thermal(void)
 {
 	int cpu = 0;
 
-	
-	cancel_delayed_work_sync(&check_temp_work);
-	flush_scheduled_work();
+     enabled = 0;
+    /* make sure check_temp is no longer running */
+    cancel_delayed_work(&check_temp_work);
+    flush_scheduled_work();
 
+    if (pre_throttled_max != 0) {
+        for_each_possible_cpu(cpu) {
+            cpu_policy = cpufreq_cpu_get(cpu);
+            if (cpu_policy) {
+                if (cpu_policy->max < cpu_policy->cpuinfo.max_freq)
+                    update_cpu_max_freq(cpu_policy, cpu, pre_throttled_max);
+                cpufreq_cpu_put(cpu_policy);
+            }
+        }
+    }
 
-	for_each_possible_cpu(cpu) {
-		update_cpu_max_freq(cpu, MSM_CPUFREQ_NO_LIMIT);
-	}
+   pr_warn("msm_thermal: Warning! Thermal guard disabled!");
+}
+
+static void enable_msm_thermal(void)
+{
+    enabled = 1;
+    /* make sure check_temp is running */
+    queue_delayed_work(check_temp_workq, &check_temp_work,
+                       msecs_to_jiffies(msm_thermal_info.poll_ms));
+
+    pr_info("msm_thermal: Thermal guard enabled.");
 }
 
 static int set_enabled(const char *val, const struct kernel_param *kp)
 {
 	int ret = 0;
 
-	ret = param_set_bool(val, kp);
-	if (!enabled)
-		disable_msm_thermal();
-	else
-		pr_info("msm_thermal: no action for enabled = %d\n", enabled);
+    ret = param_set_bool(val, kp);
+    if (!enabled)
+        disable_msm_thermal();
+    else if (enabled == 1)
+        enable_msm_thermal();
+    else
+        pr_info("msm_thermal: no action for enabled = %d\n", enabled);
 
 	pr_info("msm_thermal: enabled = %d\n", enabled);
 
