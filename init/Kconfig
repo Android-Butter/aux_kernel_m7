@@ -966,12 +966,6 @@ config CC_OPTIMIZE_FOR_SIZE
 
 	  If unsure, say Y.
 
-config CC_OPTIMIZE_ALOT
-  	bool "Use -O3"
-
-config CC_OPTIMIZE_FAST
-  	bool "Use -OFast"
-
 config SYSCTL
 	bool
 
