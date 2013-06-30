@@ -34,9 +34,6 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/cpufreq_interactive.h>
 
-#include <linux/syscalls.h>
-#include <linux/highuid.h>
-
 static int active_count;
 
 struct cpufreq_interactive_cpuinfo {
@@ -55,6 +52,7 @@ struct cpufreq_interactive_cpuinfo {
 	u64 hispeed_validate_time;
 	struct rw_semaphore enable_sem;
 	int governor_enabled;
+	int cpu_load;
 };
 
 static DEFINE_PER_CPU(struct cpufreq_interactive_cpuinfo, cpuinfo);
@@ -96,7 +94,11 @@ static unsigned long timer_rate = DEFAULT_TIMER_RATE;
  * timer interval.
  */
 #define DEFAULT_ABOVE_HISPEED_DELAY DEFAULT_TIMER_RATE
-static unsigned long above_hispeed_delay_val = DEFAULT_ABOVE_HISPEED_DELAY;
+static unsigned int default_above_hispeed_delay[] = {
+	DEFAULT_ABOVE_HISPEED_DELAY };
+static spinlock_t above_hispeed_delay_lock;
+static unsigned int *above_hispeed_delay = default_above_hispeed_delay;
+static int nabove_hispeed_delay = ARRAY_SIZE(default_above_hispeed_delay);
 
 /* Non-zero means indefinite speed boost active */
 static int boost_val;
@@ -125,18 +127,6 @@ struct cpufreq_governor cpufreq_gov_interactive = {
 	.owner = THIS_MODULE,
 };
 
-#define	AID_SYSTEM	(1000)
-static void dbs_chown(void)
-{
-	int ret;
-
-	ret =
-	sys_chown("/sys/devices/system/cpu/cpufreq/interactive/boostpulse",
-		low2highuid(AID_SYSTEM), low2highgid(0));
-	if (ret)
-		pr_err("sys_chown: boostpulse error: %d", ret);
-}
-
 static void cpufreq_interactive_timer_resched(
 	struct cpufreq_interactive_cpuinfo *pcpu)
 {
@@ -156,6 +146,23 @@ static void cpufreq_interactive_timer_resched(
 	pcpu->cputime_speedadj = 0;
 	pcpu->cputime_speedadj_timestamp = pcpu->time_in_idle_timestamp;
 	spin_unlock_irqrestore(&pcpu->load_lock, flags);
+}
+
+static unsigned int freq_to_above_hispeed_delay(unsigned int freq)
+{
+	int i;
+	unsigned int ret;
+	unsigned long flags;
+
+	spin_lock_irqsave(&above_hispeed_delay_lock, flags);
+
+	for (i = 0; i < nabove_hispeed_delay - 1 &&
+			freq >= above_hispeed_delay[i+1]; i += 2)
+		;
+
+	ret = above_hispeed_delay[i];
+	spin_unlock_irqrestore(&above_hispeed_delay_lock, flags);
+	return ret;
 }
 
 static unsigned int freq_to_targetload(unsigned int freq)
@@ -315,6 +322,8 @@ static void cpufreq_interactive_timer(unsigned long data)
 	cpu_load = loadadjfreq / pcpu->target_freq;
 	boosted = boost_val || now < boostpulse_endtime;
 
+	pcpu->cpu_load = cpu_load;
+
 	if (cpu_load >= go_hispeed_load || boosted) {
 		if (pcpu->target_freq < hispeed_freq) {
 			new_freq = hispeed_freq;
@@ -330,7 +339,8 @@ static void cpufreq_interactive_timer(unsigned long data)
 
 	if (pcpu->target_freq >= hispeed_freq &&
 	    new_freq > pcpu->target_freq &&
-	    now - pcpu->hispeed_validate_time < above_hispeed_delay_val) {
+	    now - pcpu->hispeed_validate_time <
+	    freq_to_above_hispeed_delay(pcpu->policy->cur)) {
 		trace_cpufreq_interactive_notyet(
 			data, cpu_load, pcpu->target_freq,
 			pcpu->policy->cur, new_freq);
@@ -508,6 +518,8 @@ static int cpufreq_interactive_speedchange_task(void *data)
 
 				if (pjcpu->target_freq > max_freq)
 					max_freq = pjcpu->target_freq;
+
+				cpufreq_notify_utilization(pcpu->policy, (pcpu->cpu_load * pcpu->policy->cur) / pcpu->policy->cpuinfo.max_freq);
 			}
 
 			if (max_freq != pcpu->policy->cur)
@@ -594,6 +606,56 @@ static struct notifier_block cpufreq_notifier_block = {
 	.notifier_call = cpufreq_interactive_notifier,
 };
 
+static unsigned int *get_tokenized_data(const char *buf, int *num_tokens)
+{
+	const char *cp;
+	int i;
+	int ntokens = 1;
+	unsigned int *tokenized_data;
+
+	cp = buf;
+	while ((cp = strpbrk(cp + 1, " :")))
+		ntokens++;
+
+	if (!(ntokens & 0x1)) {
+		tokenized_data = ERR_PTR(-EINVAL);
+		goto err;
+	}
+
+	tokenized_data = kmalloc(ntokens * sizeof(unsigned int), GFP_KERNEL);
+	if (!tokenized_data) {
+		tokenized_data = ERR_PTR(-ENOMEM);
+		goto err;
+	}
+
+	cp = buf;
+	i = 0;
+	while (i < ntokens) {
+		if (sscanf(cp, "%u", &tokenized_data[i++]) != 1) {
+			tokenized_data = ERR_PTR(-EINVAL);
+			goto err_kfree;
+		}
+
+		cp = strpbrk(cp, " :");
+		if (!cp)
+			break;
+		cp++;
+	}
+
+	if (i != ntokens) {
+		tokenized_data = ERR_PTR(-EINVAL);
+		goto err_kfree;
+	}
+
+	*num_tokens = ntokens;
+	return tokenized_data;
+
+err_kfree:
+	kfree(tokenized_data);
+err:
+	return tokenized_data;
+}
+
 static ssize_t show_target_loads(
 	struct kobject *kobj, struct attribute *attr, char *buf)
 {
@@ -616,40 +678,13 @@ static ssize_t store_target_loads(
 	struct kobject *kobj, struct attribute *attr, const char *buf,
 	size_t count)
 {
-	int ret;
-	const char *cp;
+	int ntokens;
 	unsigned int *new_target_loads = NULL;
-	int ntokens = 1;
-	int i;
 	unsigned long flags;
 
-	cp = buf;
-	while ((cp = strpbrk(cp + 1, " :")))
-		ntokens++;
-
-	if (!(ntokens & 0x1))
-		goto err_inval;
-
-	new_target_loads = kmalloc(ntokens * sizeof(unsigned int), GFP_KERNEL);
-	if (!new_target_loads) {
-		ret = -ENOMEM;
-		goto err;
-	}
-
-	cp = buf;
-	i = 0;
-	while (i < ntokens) {
-		if (sscanf(cp, "%u", &new_target_loads[i++]) != 1)
-			goto err_inval;
-
-		cp = strpbrk(cp, " :");
-		if (!cp)
-			break;
-		cp++;
-	}
-
-	if (i != ntokens)
-		goto err_inval;
+	new_target_loads = get_tokenized_data(buf, &ntokens);
+	if (IS_ERR(new_target_loads))
+		return PTR_RET(new_target_loads);
 
 	spin_lock_irqsave(&target_loads_lock, flags);
 	if (target_loads != default_target_loads)
@@ -658,17 +693,55 @@ static ssize_t store_target_loads(
 	ntarget_loads = ntokens;
 	spin_unlock_irqrestore(&target_loads_lock, flags);
 	return count;
-
-err_inval:
-	ret = -EINVAL;
-err:
-	kfree(new_target_loads);
-	return ret;
 }
 
 static struct global_attr target_loads_attr =
 	__ATTR(target_loads, S_IRUGO | S_IWUSR,
 		show_target_loads, store_target_loads);
+
+static ssize_t show_above_hispeed_delay(
+	struct kobject *kobj, struct attribute *attr, char *buf)
+{
+	int i;
+	ssize_t ret = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&above_hispeed_delay_lock, flags);
+
+	for (i = 0; i < nabove_hispeed_delay; i++)
+		ret += sprintf(buf + ret, "%u%s", above_hispeed_delay[i],
+			       i & 0x1 ? ":" : " ");
+
+	ret += sprintf(buf + ret, "\n");
+	spin_unlock_irqrestore(&above_hispeed_delay_lock, flags);
+	return ret;
+}
+
+static ssize_t store_above_hispeed_delay(
+	struct kobject *kobj, struct attribute *attr, const char *buf,
+	size_t count)
+{
+	int ntokens;
+	unsigned int *new_above_hispeed_delay = NULL;
+	unsigned long flags;
+
+	new_above_hispeed_delay = get_tokenized_data(buf, &ntokens);
+	if (IS_ERR(new_above_hispeed_delay))
+		return PTR_RET(new_above_hispeed_delay);
+
+	spin_lock_irqsave(&above_hispeed_delay_lock, flags);
+	if (above_hispeed_delay != default_above_hispeed_delay)
+		kfree(above_hispeed_delay);
+	above_hispeed_delay = new_above_hispeed_delay;
+	nabove_hispeed_delay = ntokens;
+	spin_unlock_irqrestore(&above_hispeed_delay_lock, flags);
+	return count;
+
+}
+
+static struct global_attr above_hispeed_delay_attr =
+	__ATTR(above_hispeed_delay, S_IRUGO | S_IWUSR,
+		show_above_hispeed_delay, store_above_hispeed_delay);
 
 static ssize_t show_hispeed_freq(struct kobject *kobj,
 				 struct attribute *attr, char *buf)
@@ -737,28 +810,6 @@ static ssize_t store_min_sample_time(struct kobject *kobj,
 
 static struct global_attr min_sample_time_attr = __ATTR(min_sample_time, 0644,
 		show_min_sample_time, store_min_sample_time);
-
-static ssize_t show_above_hispeed_delay(struct kobject *kobj,
-					struct attribute *attr, char *buf)
-{
-	return sprintf(buf, "%lu\n", above_hispeed_delay_val);
-}
-
-static ssize_t store_above_hispeed_delay(struct kobject *kobj,
-					 struct attribute *attr,
-					 const char *buf, size_t count)
-{
-	int ret;
-	unsigned long val;
-
-	ret = strict_strtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-	above_hispeed_delay_val = val;
-	return count;
-}
-
-define_one_global_rw(above_hispeed_delay);
 
 static ssize_t show_timer_rate(struct kobject *kobj,
 			struct attribute *attr, char *buf)
@@ -879,9 +930,9 @@ define_one_global_rw(boostpulse_duration);
 
 static struct attribute *interactive_attributes[] = {
 	&target_loads_attr.attr,
+	&above_hispeed_delay_attr.attr,
 	&hispeed_freq_attr.attr,
 	&go_hispeed_load_attr.attr,
-	&above_hispeed_delay.attr,
 	&min_sample_time_attr.attr,
 	&timer_rate_attr.attr,
 	&timer_slack.attr,
@@ -930,8 +981,6 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			return -EINVAL;
 
 		mutex_lock(&gov_lock);
-
-		dbs_chown();
 
 		freq_table =
 			cpufreq_frequency_get_table(policy->cpu);
