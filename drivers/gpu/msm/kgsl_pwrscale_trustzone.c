@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,9 +8,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
- * Modified by Paul Reioux (Faux123)
- * 2013-06-20: Added KGSL Simple GPU Governor
  *
  */
 
@@ -120,7 +117,7 @@ static ssize_t tz_governor_store(struct kgsl_device *device,
 		priv->governor = TZ_GOVERNOR_PERFORMANCE;
 
 	if (priv->governor == TZ_GOVERNOR_PERFORMANCE)
-		kgsl_pwrctrl_pwrlevel_change(device, pwr->max_pwrlevel);
+		kgsl_pwrctrl_pwrlevel_change(device, pwr->thermal_pwrlevel);
 
 	mutex_unlock(&device->mutex);
 	return count;
@@ -152,52 +149,45 @@ static void tz_wake(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 }
 
 #ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
+/* KGSL Simple GPU Governor */
+/* Copyright (c) 2011-2013, Paul Reioux (Faux123). All rights reserved. */
 static int default_laziness = 5;
 module_param_named(simple_laziness, default_laziness, int, 0664);
 
-static int ramp_up_threshold = 6000;
+static int ramp_up_threshold = 5500;
 module_param_named(simple_ramp_threshold, ramp_up_threshold, int, 0664);
 
 static int laziness;
 
 static int simple_governor(struct kgsl_device *device, int idle_stat)
 {
+	int val = 0;
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 
 	/* it's currently busy */
-	if (idle_stat < ramp_up_threshold) 
-	{
+	if (idle_stat < ramp_up_threshold) {
 		if (pwr->active_pwrlevel == 0)
-			/* already maxed, so do nothing */
-			return 0; 
-
+			val = 0; /* already maxed, so do nothing */
 		else if ((pwr->active_pwrlevel > 0) &&
 			(pwr->active_pwrlevel <= (pwr->num_pwrlevels - 1)))
-			/* bump up to next pwrlevel */
-			return -1; 
-	} 
+			val = -1; /* bump up to next pwrlevel */
 	/* idle case */
-	else 
-	{
+	} else {
 		if ((pwr->active_pwrlevel >= 0) &&
 			(pwr->active_pwrlevel < (pwr->num_pwrlevels - 1)))
-			if (likely(--laziness > 0)) 
-			{
-				/* don't change anything yet hold off for a while */
-				return 0;
-			} 
-			else 
-			{
-				/* above min, lower it */	
+			if (laziness > 0) {
+				/* hold off for a while */
+				laziness--;
+				val = 0; /* don't change anything yet */
+			} else {
+				val = 1; /* above min, lower it */
+				/* reset laziness count */
 				laziness = default_laziness;
-				return 1; 	
 			}
 		else if (pwr->active_pwrlevel == (pwr->num_pwrlevels - 1))
-			/* already @ min, so do nothing */
-			return 0; 
+			val = 0; /* already @ min, so do nothing */
 	}
-
-	return 0;
+	return val;
 }
 #endif
 
@@ -249,17 +239,16 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 		idle = priv->bin.total_time - priv->bin.busy_time;
 		idle = (idle > 0) ? idle : 0;
 #ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
-	if (priv->governor == TZ_GOVERNOR_SIMPLE)
-		val = simple_governor(device, idle);
-	else
-		val = __secure_tz_entry(TZ_UPDATE_ID, idle, device->id);
+		if (priv->governor == TZ_GOVERNOR_SIMPLE)
+			val = simple_governor(device, idle);
+		else
+			val = __secure_tz_entry(TZ_UPDATE_ID, idle, device->id);
 #else
-	val = __secure_tz_entry(TZ_UPDATE_ID, idle, device->id);
+		val = __secure_tz_entry(TZ_UPDATE_ID, idle, device->id);
 #endif
 	}
 	priv->bin.total_time = 0;
 	priv->bin.busy_time = 0;
-
 	if (val) {
 		kgsl_pwrctrl_pwrlevel_change(device,
 					     pwr->active_pwrlevel + val);
@@ -285,10 +274,14 @@ static void tz_sleep(struct kgsl_device *device,
 	priv->bin.busy_time = 0;
 }
 
-#ifdef CONFIG_MSM_SCM
 static int tz_init(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 {
 	struct tz_priv *priv;
+
+	/* Trustzone is only valid for some SOCs */
+	if (!(cpu_is_msm8x60() || cpu_is_msm8960() || cpu_is_apq8064() ||
+		cpu_is_msm8930() || cpu_is_msm8930aa() || cpu_is_msm8627()))
+		return -EINVAL;
 
 	priv = pwrscale->priv = kzalloc(sizeof(struct tz_priv), GFP_KERNEL);
 	if (pwrscale->priv == NULL)
@@ -300,12 +293,6 @@ static int tz_init(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 
 	return 0;
 }
-#else
-static int tz_init(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
-{
-	return -EINVAL;
-}
-#endif /* CONFIG_MSM_SCM */
 
 static void tz_close(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 {
